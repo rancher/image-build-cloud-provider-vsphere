@@ -2,7 +2,7 @@
 
 This repo builds hardened, statically-linked Go binaries from
 [kubernetes/cloud-provider-vsphere](https://github.com/kubernetes/cloud-provider-vsphere) and packages them in a minimal
-SLE BCI ([bci-nano](registry.suse.com/bci/bci-nano)) based image.
+SLE BCI ([bci-nano](https://registry.suse.com/repositories/bci-bci-nano-16-0)) based image.
 
 Binaries are compiled against [`rancher/hardened-build-base`](https://github.com/rancher/image-build-base),
 which provides the latest supported Go toolchain (FIPS/BoringCrypto-enabled on amd64).
