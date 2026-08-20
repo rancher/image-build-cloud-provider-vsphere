@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 jobs:
-  build-vsphere-cloud-controller-manager:
+  build:
     permissions:
       contents: read
       id-token: write

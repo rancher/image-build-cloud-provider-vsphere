@@ -33,6 +33,5 @@ RUN if [ "$(xx-info arch)" = "amd64" ]; then \
 # vSphere Cloud Controller Manager (CPI)
 FROM ${BCI_IMAGE} AS vsphere-cloud-controller-manager
 LABEL org.opencontainers.image.description="vSphere Cloud Controller Manager (CPI)"
-COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 COPY --from=builder /usr/local/bin/vsphere-cloud-controller-manager /vsphere-cloud-controller-manager
 ENTRYPOINT ["/vsphere-cloud-controller-manager"]
