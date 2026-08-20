@@ -17,8 +17,8 @@ sources:
         kind: semver
 
 targets:
-    tagfile:
-      name: "Bump to latest cloud-provider-vsphere version in TAG file"
+  tagfile:
+    name: "Bump to latest cloud-provider-vsphere version in TAG file"
     kind: file
     scmid: default
     disablesourceinput: true
