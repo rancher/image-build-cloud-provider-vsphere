@@ -34,7 +34,7 @@ jobs:
             base_sha="$(git rev-parse HEAD^)"
           fi
 
-          dockerfile_diff="$(git diff --unified=0 "$base_sha" "$GITHUB_SHA" -- Dockerfile)"
+          dockerfile_diff="$(git diff --unified=0 "$base_sha" "$GITHUB_SHA")"
 
           changed_lines="$(grep -E '^[+-]' <<< "$dockerfile_diff" | grep -Ev '^(\+\+\+|---)' || true)"
           changed_count="$(wc -l <<< "$changed_lines" | tr -d ' ')"
