@@ -1,3 +1,7 @@
 # google.golang.org/grpc: GHSA-hrxh-6v49-42gf (xDS RBAC auth bypass, HTTP/2 Rapid Reset DoS), CVE-2026-84304 (data race on stream context).
 # Drop once upstream requires google.golang.org/grpc >= v1.83.1.
 -replace google.golang.org/grpc=google.golang.org/grpc@v1.83.1
+
+# golang.org/x/crypto: CVE-2026-56855, CVE-2026-78662 (golang.org/x/crypto/ssh DoS on deadlocked channels), GO-2026-5932 (unmaintained openpgp package).
+# Drop once upstream requires golang.org/x/crypto >= v0.56.0.
+-replace golang.org/x/crypto=golang.org/x/crypto@v0.56.0
