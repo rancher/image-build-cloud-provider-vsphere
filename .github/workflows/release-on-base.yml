@@ -84,10 +84,35 @@ jobs:
           client-id: ${{ env.APP_ID }}
           private-key: ${{ env.PRIVATE_KEY }}
 
-      - name: Republish Latest Release
-        uses: rancher/ecm-distro-tools/actions/republish-latest@086cd2f90ed82712e45701441a00e59b95b578c1 # v0.77.1
-        with:
-          owner: ${{ github.repository_owner }}
-          repo: ${{ github.event.repository.name }}
-          commitish: 'main'
+      - name: Create releases for configured versions
+        env:
           GH_TOKEN: ${{ steps.generate-token.outputs.token }}
+        run: |
+          set -euo pipefail
+
+          build_meta="$(make -s log | sed -n 's/^BUILD_META=//p')"
+          if [[ -z "$build_meta" ]]; then
+            echo "Unable to determine BUILD_META from the Makefile"
+            exit 1
+          fi
+
+          while IFS= read -r base_tag || [[ -n "$base_tag" ]]; do
+            [[ -z "$base_tag" ]] && continue
+
+            if ! [[ "$base_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "Invalid TAG entry: $base_tag"
+              exit 1
+            fi
+
+            release_tag="${base_tag}${build_meta}"
+            if gh release view "$release_tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+              echo "Release $release_tag already exists; skipping"
+              continue
+            fi
+
+            gh release create "$release_tag" \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "$release_tag" \
+              --generate-notes
+          done < TAG

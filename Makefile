@@ -16,7 +16,7 @@ BUILD_META=-build$(shell date +%Y%m%d)
 TAG ?= ${GITHUB_ACTION_TAG}
 
 ifeq ($(TAG),)
-TAG := $(shell cat TAG)$(BUILD_META)
+TAG := $(shell head -n1 TAG)$(BUILD_META)
 endif
 
 ifeq (,$(filter %$(BUILD_META),$(TAG)))
@@ -33,6 +33,12 @@ build-image-vsphere-cloud-controller-manager:
 		--tag $(IMAGE) \
 		--load \
 	.
+
+.PHONY: build-image-all
+build-image-all:
+	@for tag in $(shell cat TAG); do \
+		TAG=$$tag$(BUILD_META) $(MAKE) build-image-vsphere-cloud-controller-manager; \
+	done
 
 .PHONY: push-image-vsphere-cloud-controller-manager
 push-image-vsphere-cloud-controller-manager: IMAGE = $(REPO)/hardened-cloud-provider-vsphere:$(TAG)
