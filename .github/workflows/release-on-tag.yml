@@ -9,47 +9,57 @@ on:
       - 'TAG'
 
 permissions:
-  contents: write
-  id-token: write
+  contents: read
 
 jobs:
   release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
     steps:
       - name: Check out code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
 
-      - name: Calculate release tag from TAG file default
-        run: |
-          TAG=$(make -s log | grep '^TAG=' | cut -d '=' -f2)
-          BUILD_META=$(make -s log | grep '^BUILD_META=' | cut -d '=' -f2)
-          echo "RELEASE_TAG=${TAG}${BUILD_META}" >> "$GITHUB_ENV"
-
-      - name: Validate TAG-only change and release uniqueness
+      - name: Validate TAG-only change and collect release tags
         id: validate
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          SHOULD_RELEASE=true
+          set -euo pipefail
 
-          if [[ "${{ github.event_name }}" == "push" ]]; then
-            if [[ "${{ github.event.before }}" == "0000000000000000000000000000000000000000" ]]; then
-              echo "Push has no previous commit; skipping release"
-              SHOULD_RELEASE=false
-            elif [[ "$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}")" != "TAG" ]]; then
-              echo "Push changed files other than TAG; skipping release"
-              SHOULD_RELEASE=false
+          SHOULD_RELEASE=false
+          release_tags=""
+          base_sha="${{ github.event.before }}"
+
+          if [[ "$base_sha" == "0000000000000000000000000000000000000000000" ]]; then
+            echo "Push has no previous commit; skipping release"
+          elif [[ "$(git diff --name-only "$base_sha" "$GITHUB_SHA")" != "TAG" ]]; then
+            echo "Push changed files other than TAG; skipping release"
+          else
+            mapfile -t release_tags < <(git diff --unified=0 "$base_sha" "$GITHUB_SHA" -- TAG | awk '/^\+/ && !/^\+\+\+/ { print substr($0, 2) }')
+
+            if [[ "${#release_tags[@]}" -eq 0 ]]; then
+              echo "TAG changed without adding or updating a release version; skipping release"
+            else
+              for release_tag in "${release_tags[@]}"; do
+                if ! [[ "$release_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                  echo "Invalid TAG entry: $release_tag"
+                  exit 1
+                fi
+              done
+
+              release_tags="$(printf '%s\n' "${release_tags[@]}")"
+              SHOULD_RELEASE=true
             fi
           fi
 
-          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            echo "Release $RELEASE_TAG already exists; skipping"
-            SHOULD_RELEASE=false
-          fi
-
           echo "should_release=$SHOULD_RELEASE" >> "$GITHUB_OUTPUT"
+          {
+            echo "release_tags<<EOF"
+            printf '%s\n' "$release_tags"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Read app secrets
         if: steps.validate.outputs.should_release == 'true'
@@ -67,12 +77,30 @@ jobs:
           client-id: ${{ env.APP_ID }}
           private-key: ${{ env.PRIVATE_KEY }}
 
-      - name: Create GitHub release if missing
+      - name: Create GitHub releases for changed TAG entries
         if: steps.validate.outputs.should_release == 'true'
         env:
           GH_TOKEN: ${{ steps.generate-token.outputs.token }}
+          RELEASE_TAGS: ${{ steps.validate.outputs.release_tags }}
         run: |
-          gh release create "$RELEASE_TAG" \
-            --target main \
-            --title "$RELEASE_TAG" \
-            --generate-notes
+          set -euo pipefail
+
+          build_meta="$(make -s log | sed -n 's/^BUILD_META=//p')"
+          if [[ -z "$build_meta" ]]; then
+            echo "Unable to determine BUILD_META from the Makefile"
+            exit 1
+          fi
+
+          for base_tag in $RELEASE_TAGS; do
+            release_tag="${base_tag}${build_meta}"
+            if gh release view "$release_tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+              echo "Release $release_tag already exists; skipping"
+              continue
+            fi
+
+            gh release create "$release_tag" \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "$release_tag" \
+              --generate-notes
+              done

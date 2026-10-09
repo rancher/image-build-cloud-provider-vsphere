@@ -3,37 +3,46 @@ name: "Update cloud-provider-vsphere version"
 
 sources:
   upstream:
-    name: Get cloud-provider-vsphere version
-    kind: githubrelease
+    name: Get the three latest cloud-provider-vsphere minor versions
+    kind: shell
     spec:
-      owner: kubernetes
-      repository: cloud-provider-vsphere
-      token: '{{ requiredEnv .github.token }}'
-      typefilter:
-        release: true
-        draft: false
-        prerelease: false
-      versionfilter:
-        kind: semver
+      shell: /bin/bash
+      command: |
+        set -euo pipefail
+        versions="$({
+          curl -fsSL \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'Authorization: Bearer {{ requiredEnv .github.token }}' \
+            'https://api.github.com/repos/kubernetes/cloud-provider-vsphere/releases?per_page=100' |
+            jq -r '[.[] | select(.draft | not) | select(.prerelease | not) | .tag_name | select(test("^v[0-9]+\\.[0-9]+\\.[0-9]+$"))] | .[]' |
+            sort -Vr |
+            awk -F. '!seen[$1 FS $2]++' |
+            head -n 3
+        })"
+
+        if [[ "$(printf '%s\n' "$versions" | wc -l)" -ne 3 ]]; then
+          echo "Expected three cloud-provider-vsphere minor versions, found: $versions" >&2
+          exit 1
+        fi
+
+        printf '%s\n' "$versions"
 
 targets:
   tagfile:
-    name: "Bump to latest cloud-provider-vsphere version in TAG file"
+    name: "Bump the three latest cloud-provider-vsphere minor versions in TAG"
     kind: file
+    sourceid: upstream
     scmid: default
-    disablesourceinput: true
     spec:
       file: TAG
-      matchpattern: '(?m)^(.+)$'
-      replacepattern: '{{ source "upstream" }}'
 
 scms:
   default:
     kind: github
     spec:
       token: '{{ requiredEnv .github.token }}'
-      username: '{{ .github.username }}'
-      user: '{{ .github.username }}'
+      username: '{{ requiredEnv .github.username }}'
+      user: '{{ .github.user }}'
       email: '{{ .github.email }}'
       owner: '{{ .github.owner }}'
       repository: '{{ .github.repository }}'
@@ -41,7 +50,7 @@ scms:
 
 actions:
   default:
-    title: 'Bump cloud-provider-vsphere version to {{ source "upstream" }}'
+    title: 'Bump the three latest cloud-provider-vsphere minor versions'
     kind: github/pullrequest
     spec:
       merge:
